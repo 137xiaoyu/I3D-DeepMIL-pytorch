@@ -31,6 +31,40 @@ from pytorch_i3d import InceptionI3d
 
 from charades_dataset_full import Charades as Dataset
 import cv2
+import time
+
+
+class Timer:
+    def __init__(self, func=time.perf_counter):
+        self.elapsed = 0.0
+        self._func = func
+        self._start = None
+
+    def start(self):
+        if self._start is not None:
+            raise RuntimeError('Already started')
+        self._start = self._func()
+
+    def stop(self):
+        if self._start is None:
+            raise RuntimeError('Not started')
+        end = self._func()
+        self.elapsed += end - self._start
+        self._start = None
+
+    def reset(self):
+        self.elapsed = 0.0
+
+    @property
+    def running(self):
+        return self._start is not None
+
+    def __enter__(self):
+        self.start()
+        return self
+
+    def __exit__(self, *args):
+        self.stop()
 
 
 def load_rgb_frames(image_dir, start):
@@ -48,6 +82,26 @@ def load_rgb_frames(image_dir, start):
     return np.asarray(frames, dtype=np.float32)
 
 
+def load_rgb_video(video_name):
+    cap = cv2.VideoCapture(video_name)
+    num_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    frames = []
+    while True:
+        ret, frame = cap.read()
+        if ret:
+            img = frame[:, :, [2, 1, 0]]
+            w, h, c = img.shape
+            if w < 256 or h < 256:
+                d = 256. - min(w, h)
+                sc = 1 + d / min(w, h)
+                img = cv2.resize(img, dsize=(0, 0), fx=sc, fy=sc)
+            img = (img / 255.) * 2 - 1
+            frames.append(img)
+        else:
+            break
+    return np.asarray(frames, dtype=np.float32)
+
+
 def run(max_steps=64e3,
         mode='rgb',
         root='/ssd2/charades/Charades_v1_rgb',
@@ -58,6 +112,7 @@ def run(max_steps=64e3,
     # setup dataset
     name = 'Abuse001_x264'
     img_dir = f'D:/Users/Chase/Desktop/{name}/'
+    video_name = f'D:/Users/Chase/Desktop/{name}.mp4'
     test_transforms = transforms.Compose([videotransforms.CenterCrop(224)])
 
     # setup the model
@@ -70,10 +125,15 @@ def run(max_steps=64e3,
     i3d.cuda()
 
     i3d.eval()  # Set model to evaluate mode
+    t = Timer()
 
     with torch.no_grad():
         # get the inputs
+        t.start()
         inputs = load_rgb_frames(img_dir, 1)  # t, h, w, c
+        # inputs = load_rgb_video(video_name)
+        t.stop()
+        print(t.elapsed)
         inputs = test_transforms(inputs)
         inputs = torch.from_numpy(inputs.transpose([3, 0, 1, 2])).unsqueeze(0)  # b, c, t, h, w
 
