@@ -15,10 +15,10 @@ from pytorch_i3d import InceptionI3d
 parser = argparse.ArgumentParser()
 parser.add_argument('--mode', type=str, default='rgb', help='rgb or flow')
 parser.add_argument('--ckpt', default='models/rgb_imagenet.pt', type=str)
-parser.add_argument('--h5_file', default='E:/137/dataset/VAD/UCF_Crime/videos/h5py/UCF_Crime.h5', type=str)
-parser.add_argument('--train_split', default='D:/137/workspace/python_projects/VAD_workspace/my_vad/misc/UCF_Crime_train.txt', type=str)
-parser.add_argument('--test_split', default='D:/137/workspace/python_projects/VAD_workspace/my_vad/misc/UCF_Crime_test.txt', type=str)
-parser.add_argument('--save_dir', default='E:/137/dataset/VAD/UCF_Crime/features/I3D/', type=str)
+parser.add_argument('--h5_file', default='E:/137/dataset/VAD/ShanghaiTech/videos/h5py/ShanghaiTech.h5', type=str)
+parser.add_argument('--train_split', default='D:/137/workspace/python_projects/VAD_workspace/my_vad/misc/ShanghaiTech_train.txt', type=str)
+parser.add_argument('--test_split', default='D:/137/workspace/python_projects/VAD_workspace/my_vad/misc/ShanghaiTech_test.txt', type=str)
+parser.add_argument('--save_dir', default='E:/137/dataset/VAD/ShanghaiTech/features/I3D/', type=str)
 
 args = parser.parse_args()
 

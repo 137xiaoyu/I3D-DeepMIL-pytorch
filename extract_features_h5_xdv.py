@@ -15,10 +15,10 @@ from pytorch_i3d import InceptionI3d
 parser = argparse.ArgumentParser()
 parser.add_argument('--mode', type=str, default='rgb', help='rgb or flow')
 parser.add_argument('--ckpt', default='models/rgb_imagenet.pt', type=str)
-parser.add_argument('--h5_file', default='E:/137/dataset/VAD/UCF_Crime/videos/h5py/UCF_Crime.h5', type=str)
-parser.add_argument('--train_split', default='D:/137/workspace/python_projects/VAD_workspace/my_vad/misc/UCF_Crime_train.txt', type=str)
-parser.add_argument('--test_split', default='D:/137/workspace/python_projects/VAD_workspace/my_vad/misc/UCF_Crime_test.txt', type=str)
-parser.add_argument('--save_dir', default='E:/137/dataset/VAD/UCF_Crime/features/I3D/', type=str)
+parser.add_argument('--h5_file', default='E:/137/dataset/VAD/XD_Violence/videos/h5py/XD_Violence.h5', type=str)
+parser.add_argument('--train_split', default='D:/137/workspace/python_projects/VAD_workspace/my_vad/misc/XD_Violence_train.txt', type=str)
+parser.add_argument('--test_split', default='D:/137/workspace/python_projects/VAD_workspace/my_vad/misc/XD_Violence_test.txt', type=str)
+parser.add_argument('--save_dir', default='E:/137/dataset/VAD/XD_Violence/features/I3D/', type=str)
 
 args = parser.parse_args()
 
@@ -68,8 +68,8 @@ def save_features(model, video_list, transforms, train=False):
                     features.append(outputs.squeeze(0).permute(1, 2, 3, 0).cpu().numpy())
 
                 save_path = os.path.join(args.save_dir, status)
-                if not os.path.exists(save_path):
-                    os.makedirs(save_path)
+                if not os.path.exists(os.path.join(save_path, video_name.split('/')[0])):
+                    os.makedirs(os.path.join(save_path, video_name.split('/')[0]))
 
                 np.save(os.path.join(save_path, video_name + '.npy'), np.concatenate(features, axis=0).squeeze((1, 2)))
 
