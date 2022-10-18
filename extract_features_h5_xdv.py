@@ -18,7 +18,7 @@ parser.add_argument('--ckpt', default='models/rgb_imagenet.pt', type=str)
 parser.add_argument('--h5_file', default='E:/137/dataset/VAD/XD_Violence/videos/h5py/XD_Violence.h5', type=str)
 parser.add_argument('--train_split', default='D:/137/workspace/python_projects/VAD_workspace/my_vad/misc/XD_Violence_train.txt', type=str)
 parser.add_argument('--test_split', default='D:/137/workspace/python_projects/VAD_workspace/my_vad/misc/XD_Violence_test.txt', type=str)
-parser.add_argument('--save_dir', default='E:/137/dataset/VAD/XD_Violence/features/I3D/', type=str)
+parser.add_argument('--save_dir', default='E:/137/dataset/VAD/XD_Violence/my_features/I3D/', type=str)
 
 args = parser.parse_args()
 
@@ -28,16 +28,16 @@ def decode_frames(raw_frames, shorter_side, transforms):
     for frame in raw_frames:
         img = cv2.cvtColor(cv2.imdecode(frame, cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB)
         h, w, c = img.shape
-        if h < shorter_side or w < shorter_side:
-            d = float(shorter_side) - min(h, w)
-            sc = 1 + d / min(h, w)
-            img = cv2.resize(img, dsize=(0, 0), fx=sc, fy=sc)
+        d = float(shorter_side) - min(h, w)
+        sc = 1 + d / min(h, w)
+        img = cv2.resize(img, dsize=(0, 0), fx=sc, fy=sc)
         img = (img / 255.) * 2 - 1
+        assert min(img.shape[:2]) == shorter_side
         frames.append(img)
 
-    frames = np.asarray(frames, dtype=np.float32)
+    frames = torch.from_numpy(np.asarray(frames, dtype=np.float32)).permute(0, 3, 1, 2)  # (t, h, w, c) -> (t, c, h, w)
     if transforms is not None:
-        frames = transforms(frames)
+        frames = transforms(frames).permute(0, 2, 1, 3, 4)  # (10, t, c, h, w) -> (10, c, t, h, w)
     return frames
 
 
@@ -59,19 +59,17 @@ def save_features(model, video_list, transforms, train=False):
                         key = '{:06d}'.format(idx * 16 + i)
                         raw_frames.append(h5_file[video_name][key][:])
 
-                    frames = decode_frames(raw_frames, 256, transforms)  # t h w c
+                    frames = decode_frames(raw_frames, 256, transforms)  # 10, c, t, h, w
+                    inputs = frames.cuda()  # 10, c, t, h, w
 
-                    inputs = torch.from_numpy(frames.transpose([3, 0, 1, 2])).unsqueeze(0)  # b, c, t, h, w
-                    inputs = inputs.cuda()
-
-                    outputs = model.extract_features(inputs)
-                    features.append(outputs.squeeze(0).permute(1, 2, 3, 0).cpu().numpy())
+                    outputs = model.extract_features(inputs)  # (10, 1024, 1, 1, 1)
+                    features.append(outputs.squeeze(-1).squeeze(-1).squeeze(-1).cpu().numpy())  # (n, 10, 1024)
 
                 save_path = os.path.join(args.save_dir, status)
                 if not os.path.exists(os.path.join(save_path, video_name.split('/')[0])):
                     os.makedirs(os.path.join(save_path, video_name.split('/')[0]))
 
-                np.save(os.path.join(save_path, video_name + '.npy'), np.concatenate(features, axis=0).squeeze((1, 2)))
+                np.save(os.path.join(save_path, video_name + '.npy'), np.stack(features, axis=0))  # (n, 10, 1024)
 
 
 def main():
@@ -83,7 +81,8 @@ def main():
     i3d.load_state_dict(torch.load(args.ckpt))
     i3d.cuda()
 
-    test_transforms = transforms.Compose([videotransforms.CenterCrop(224)])
+    # test_transforms = transforms.Compose([videotransforms.CenterCrop(224)])
+    test_transforms = transforms.Compose([transforms.FiveCrop(224), transforms.Lambda(lambda crops: torch.stack(crops))])
 
     with open(args.train_split, 'r') as txt_file:
         train_video_list = txt_file.readlines()
