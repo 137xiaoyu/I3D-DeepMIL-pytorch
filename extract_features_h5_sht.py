@@ -5,20 +5,21 @@ import cv2
 import h5py
 import numpy as np
 import torch
+from collections import OrderedDict
 from torch.utils.data import Dataset
 from torchvision import transforms
 from tqdm import tqdm
 
 import videotransforms
-from pytorch_i3d import InceptionI3d
+from Model import Model
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--mode', type=str, default='rgb', help='rgb or flow')
-parser.add_argument('--ckpt', default='models/rgb_imagenet.pt', type=str)
-parser.add_argument('--h5_file', default='E:/137/dataset/VAD/ShanghaiTech/videos/h5py/ShanghaiTech.h5', type=str)
+parser.add_argument('--ckpt', default='vad_ckpt/checkpoint_0015.pth.tar', type=str)
+parser.add_argument('--h5_file', default='D:/137/dataset/VAD/ShanghaiTech/videos/h5py/ShanghaiTech.h5', type=str)
 parser.add_argument('--train_split', default='D:/137/workspace/python_projects/VAD_workspace/my_vad/misc/ShanghaiTech_train.txt', type=str)
 parser.add_argument('--test_split', default='D:/137/workspace/python_projects/VAD_workspace/my_vad/misc/ShanghaiTech_test.txt', type=str)
-parser.add_argument('--save_dir', default='E:/137/dataset/VAD/ShanghaiTech/my_features/I3D/', type=str)
+parser.add_argument('--save_dir', default='D:/137/dataset/VAD/ShanghaiTech/my_features/I3D-10crop/', type=str)
 
 args = parser.parse_args()
 
@@ -62,8 +63,8 @@ def save_features(model, video_list, transforms, train=False):
                     frames = decode_frames(raw_frames, 256, transforms)  # 10, c, t, h, w
                     inputs = frames.cuda()  # 10, c, t, h, w
 
-                    outputs = model.extract_features(inputs)  # (10, 1024, 1, 1, 1)
-                    features.append(outputs.squeeze(-1).squeeze(-1).squeeze(-1).cpu().numpy())  # (n, 10, 1024)
+                    logits, outputs = model(inputs)  # (10, 2), (10, 1024)
+                    features.append(outputs.cpu().numpy())  # (n, 10, 1024)
 
                 save_path = os.path.join(args.save_dir, status)
                 if not os.path.exists(save_path):
@@ -73,12 +74,17 @@ def save_features(model, video_list, transforms, train=False):
 
 
 def main():
-    if args.mode == 'flow':
-        i3d = InceptionI3d(400, in_channels=2)
-    else:
-        i3d = InceptionI3d(400, in_channels=3)
+    i3d = Model(2)
 
-    i3d.load_state_dict(torch.load(args.ckpt))
+    checkpoint = torch.load(args.ckpt)
+
+    new_dict = OrderedDict()
+    for k, v in checkpoint['state_dict'].items():
+        if 'queue' in k:
+            continue
+        new_dict[k] = v
+
+    i3d.load_state_dict(new_dict)
     i3d.cuda()
 
     # test_transforms = transforms.Compose([videotransforms.CenterCrop(224)])
